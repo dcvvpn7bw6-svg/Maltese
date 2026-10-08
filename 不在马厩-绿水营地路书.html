@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自驾路书 · 可编辑模板</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --green:#1d4a2c; --green2:#2a6136; --gold:#c8952f; --coral:#c83c2d;
+  --blue:#2f7d95; --paper:#f6f7f3; --ink:#22331f; --sub:#8fa383;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
+  background:var(--paper);color:var(--ink);line-height:1.7}
+
+/* ---------- 顶部 ---------- */
+header{background:linear-gradient(135deg,#1d4a2c 0%,#2a6136 70%,#387046 100%);
+  color:#fff;padding:26px 34px 20px}
+header h1{font-size:26px;letter-spacing:3px;margin-bottom:6px}
+header .sub{font-size:13px;color:#d6e2d0;letter-spacing:1px}
+.chips{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.chip{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.35);
+  border-radius:20px;padding:4px 16px;font-size:12.5px;letter-spacing:1px}
+.chip b{color:#ffd98a}
+
+/* ---------- 编辑条 ---------- */
+.editbar{background:#241f12;color:#f0e6cf;font-size:12.5px;
+  padding:9px 34px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.editbar .dot{width:8px;height:8px;border-radius:50%;background:#d9b355;
+  box-shadow:0 0 8px #d9b355;flex:none}
+.editbar code{background:rgba(255,255,255,.14);padding:1px 7px;border-radius:4px;
+  font-family:Consolas,Monaco,monospace;font-size:12px}
+.editbar button{background:#d9b355;color:#241f12;border:0;border-radius:5px;
+  padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer}
+.editbar button:hover{background:#e8c76e}
+
+/* ---------- 地图 ---------- */
+#map{height:580px;width:100%;border-bottom:4px solid var(--gold);
+  background:#e8ede4}
+.map-note{background:#eef4ea;border-bottom:1px solid #dfe7d8;
+  padding:7px 34px;font-size:12px;color:#6b7f63}
+
+/* ---------- 主体 ---------- */
+.wrap{max-width:1180px;margin:0 auto;padding:26px 20px 44px}
+.section-t{display:flex;align-items:center;gap:12px;margin:6px 0 18px}
+.section-t .bar{width:6px;height:26px;background:var(--gold);border-radius:3px}
+.section-t h2{font-size:19px;color:var(--green);letter-spacing:2px}
+.section-t .cnt{margin-left:auto;font-size:12.5px;color:var(--sub)}
+
+.stops{display:flex;flex-direction:column;gap:16px}
+.stop{background:#fff;border:1px solid #dfe7d8;border-left:6px solid var(--green2);
+  border-radius:10px;padding:16px 20px;display:flex;gap:18px;align-items:flex-start;
+  box-shadow:0 1px 4px rgba(40,70,40,.06)}
+.stop.start{border-left-color:var(--coral)}
+.stop.stoptype{border-left-color:var(--blue)}
+.stop.end{border-left-color:var(--gold)}
+.no{flex:0 0 44px;height:44px;border-radius:50%;background:var(--green2);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700}
+.stop.start .no{background:var(--coral)}
+.stop.end .no{background:var(--gold)}
+.stop.stoptype .no{background:var(--blue)}
+.info{flex:1;min-width:0}
+.info h3{font-size:16.5px;color:var(--green);margin-bottom:3px}
+.info h3 small{font-weight:400;color:var(--sub);font-size:12px;margin-left:8px}
+.info .desc{font-size:13px;color:#4a5a44;line-height:1.75;margin-top:6px}
+.time{display:inline-block;background:#eef4ea;color:var(--green2);border-radius:12px;
+  font-size:12px;padding:2px 12px;margin-top:8px;font-weight:700;letter-spacing:1px}
+.photo{flex:0 0 168px;height:118px;border:2px dashed #c3d0ba;border-radius:8px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:#9fb094;font-size:12px;gap:3px;background:#fafcf8;text-align:center;
+  overflow:hidden;cursor:pointer;transition:.18s}
+.photo:hover{border-color:var(--gold);background:#fffdf6}
+.photo .ic{font-size:24px}
+.photo img{width:100%;height:100%;object-fit:cover}
+
+/* ---------- 沿途影像（照片墙） ---------- */
+.gallery{margin-top:34px;display:grid;grid-template-columns:repeat(3,1fr);
+  grid-auto-rows:214px;gap:14px}
+/* 成组大图：横跨两列，用于放最出片的一张 */
+.gallery .shot.wide{grid-column:span 2}
+.shot{position:relative;border-radius:11px;overflow:hidden;background:#fff;
+  border:1px solid #dfe7d8;box-shadow:0 1px 5px rgba(40,70,40,.08);
+  display:flex;flex-direction:column}
+.shot .frame{flex:1;min-height:0;display:flex;align-items:center;
+  justify-content:center;color:#9fb094;font-size:12px;gap:4px;text-align:center;
+  background:repeating-linear-gradient(45deg,#fafcf8,#fafcf8 12px,#f4f8f0 12px,#f4f8f0 24px);
+  border-bottom:2px dashed #d9e3d2}
+.shot .frame .ic{font-size:26px;display:block;margin-bottom:2px}
+.shot .frame img{width:100%;height:100%;object-fit:cover;display:block}
+.shot .cap{padding:8px 13px 9px;font-size:12.5px;color:#3c4d36;line-height:1.5;
+  background:#fff}
+.shot .cap b{display:block;font-size:13px;color:var(--green);margin-bottom:1px}
+.shot .cap .geo{font-size:11px;color:#93a389;letter-spacing:.3px}
+.shot .tag{position:absolute;left:10px;top:10px;background:rgba(29,74,44,.86);
+  color:#fff;font-size:11px;border-radius:12px;padding:2px 10px;
+  letter-spacing:.5px;backdrop-filter:blur(2px)}
+/* 跨列大图上的图注压在地图上方更紧凑 */
+.shot.wide .cap{position:absolute;left:0;right:0;bottom:0;background:none;
+  background:linear-gradient(transparent,rgba(12,26,16,.82));color:#fff}
+.shot.wide .cap b{color:#fff}
+.shot.wide .cap .geo{color:#cfe0c4}
+
+/* ---------- 提示卡 ---------- */
+.tips{margin-top:34px}
+.tip-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tip{border-radius:10px;padding:13px 16px;font-size:13px;line-height:1.7;
+  background:#fdf6e8;border:1px solid #e8d5a8;color:#5a4a2a}
+.tip.warn{background:#fdf0ee;border-color:#e6b8b0;color:#6a3a30}
+.tip b{display:block;margin-bottom:2px}
+
+/* ---------- 表格 ---------- */
+.tblwrap{margin-top:34px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;
+  border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(40,70,40,.07)}
+th{background:var(--green2);color:#fff;padding:10px 13px;text-align:left;
+  font-weight:700;letter-spacing:.5px;white-space:nowrap}
+td{padding:9px 13px;border-top:1px solid #e5ebe0;color:#4a5a44;vertical-align:top}
+tr:nth-child(even) td{background:#f8faf6}
+
+footer{text-align:center;color:var(--sub);font-size:11.5px;padding:20px;
+  border-top:1px solid #e2e8dc;letter-spacing:1px;line-height:1.9;margin-top:30px}
+
+/* ---------- 地图图钉（emoji 版） ---------- */
+.pin-wrap{position:relative}
+.pin{
+  width:40px;height:40px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+  border:3px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,.4);
+  display:flex;align-items:center;justify-content:center;
+}
+.pin span{transform:rotate(45deg);font-size:19px;line-height:1;
+  /* emoji 自带色彩，无需改色 */}
+
+/* 常驻地名标签 */
+.pin-label{
+  position:absolute;left:50%;top:-52px;transform:translateX(-50%);
+  white-space:nowrap;background:#fff;border:2px solid #2a6136;
+  border-radius:14px;padding:3px 12px 4px;font-size:12.5px;font-weight:700;
+  color:#1d4a2c;box-shadow:0 2px 6px rgba(0,0,0,.22);
+  font-family:"Microsoft YaHei","PingFang SC",sans-serif;
+  letter-spacing:.4px;pointer-events:none;text-align:center;line-height:1.25;
+}
+/* 标签内的小字：行政区划 */
+.pin-label .loc{
+  display:block;font-size:10px;font-weight:400;color:#7d8f75;
+  letter-spacing:.2px;margin-top:1px;
+}
+.pin-label::after{
+  content:"";position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);
+  border-left:6px solid transparent;border-right:6px solid transparent;
+  border-top:7px solid #fff;
+}
+.pin-label.lbl-start{border-color:#c83c2d;color:#a82c1e}
+.pin-label.lbl-end{border-color:#c8952f;color:#8a5a1a}
+.pin-label.lbl-stop{border-color:#2f7d95;color:#1f5f74}
+
+.leaflet-popup-content-wrapper{border-radius:10px}
+.leaflet-popup-content-wrapper{border-radius:10px}
+.leaflet-popup-content{margin:12px 16px;font-size:13px;line-height:1.6}
+.pk-title{font-weight:700;color:var(--green);font-size:14.5px}
+.pk-sub{color:#8a7a55;font-size:12px;margin-bottom:5px}
+.pk-photo{margin-top:8px;border-radius:6px;overflow:hidden;max-width:210px}
+.pk-photo img{width:100%;display:block}
+/* 弹窗内的附加区块 */
+.pk-extra{margin-top:8px;padding:8px 10px;background:#f4f8f1;
+  border-left:3px solid #c8952f;border-radius:5px;font-size:12px;line-height:1.55}
+.pk-extra b{display:block;color:#1d4a2c;font-size:12.5px;margin-bottom:2px}
+.pk-extra span{color:#4a5a44}
+
+/* 卡片内的附加区块 */
+.extra-box{margin-top:10px;padding:10px 14px;background:#f7faf5;
+  border:1px solid #e2ead9;border-left:4px solid #c8952f;border-radius:7px}
+.extra-box .ex-item + .ex-item{margin-top:9px;padding-top:9px;border-top:1px dashed #dde7d4}
+.extra-box .ex-t{font-size:13px;font-weight:700;color:#1d4a2c;margin-bottom:2px}
+.extra-box .ex-d{font-size:12.5px;color:#4a5a44;line-height:1.65}
+
+@media (max-width:760px){
+  .tip-grid{grid-template-columns:1fr}
+  .stop{flex-wrap:wrap}
+  #map{height:400px}
+  .editbar{padding:9px 18px}
+  header{padding:22px 18px 18px}
+  .gallery{grid-template-columns:1fr 1fr;grid-auto-rows:150px}
+  .gallery .shot.wide{grid-column:span 2}
+}
+@media print{
+  .editbar,.map-note{display:none}
+  #map{height:420px}
+  body{background:#fff}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="h-title">自驾路书</h1>
+  <div class="sub" id="h-sub"></div>
+  <div class="chips" id="h-chips"></div>
+</header>
+
+
+<div id="map"></div>
+<div class="map-note" id="map-note"></div>
+
+<div class="wrap">
+  <div class="section-t">
+    <div class="bar"></div><h2>沿途节点</h2>
+    <div class="cnt" id="stop-count"></div>
+  </div>
+  <div class="stops" id="stops"></div>
+
+  <div class="gallery-wrap">
+    <div class="section-t">
+      <div class="bar"></div><h2>沿途影像</h2>
+      <div class="cnt" id="photo-count"></div>
+    </div>
+    <div class="gallery" id="gallery"></div>
+  </div>
+
+  <div class="tips">
+    <div class="section-t"><div class="bar"></div><h2>关键提醒</h2></div>
+    <div class="tip-grid" id="tips"></div>
+  </div>
+
+  <div class="tblwrap">
+    <div class="section-t"><div class="bar"></div><h2>里程与用时</h2></div>
+    <table>
+      <thead><tr><th>序号</th><th>路段</th><th>参考里程</th><th>说明</th></tr></thead>
+      <tbody id="seg-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<footer id="footer"></footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ============================================================================
+ *  ██  可编辑配置区 —— 改这里就够了  ██
+ * ----------------------------------------------------------------------------
+ *  1. 路线节点：在 stops 数组里加/删/改条目，地图与卡片会同步更新
+ *     lat / lng  —— 经纬度（可在高德/百度地图上右键「复制坐标」取得）
+ *     type       —— start（起点）/ spot（途经点）/ stop（补给点）/ end（终点）
+ *     time       —— 时间轴文案
+ *     desc       —— 描述文字
+ *     photo      —— 照片地址；留 "" 就显示「待补」占位框
+ *
+ *  2. 照片三种放法（任选）：
+ *     ① 同目录放图片，写文件名：  photo: "1-咖啡馆.jpg"
+ *     ② 绝对路径：                photo: "D:/路书/1.jpg"
+ *     ③ 直接粘贴 base64：          photo: "data:image/jpeg;base64,/9j/4AAQ..."
+ *
+ *  3. 统计数字（里程/用时/打卡点数量）由下面的 stats 控制，改数字即可。
+ *     地图上方的「图层」请按需在 LAYERS 里增删。
+ * ==========================================================================*/
+
+/* ---- 真实路网轨迹（OSRM 沿实际道路生成，请勿手工编辑） ---- */
+const ROUTE_GEOM = [
+    [46.51541,121.39445], [46.5087,121.38505], [46.50772,121.38201], [46.50735,121.38001], [46.50775,121.37343], [46.50515,121.36599],
+    [46.50392,121.35882], [46.50468,121.35548], [46.54972,121.3222], [46.56167,121.31187], [46.56683,121.31088], [46.56967,121.30709],
+    [46.57697,121.30354], [46.58091,121.30045], [46.58238,121.29861], [46.58421,121.29079], [46.58635,121.28655], [46.60514,121.26587],
+    [46.60577,121.2616], [46.60294,121.25404], [46.60185,121.2471], [46.60231,121.23624], [46.60297,121.23601], [46.60311,121.22282],
+    [46.60234,121.19991], [46.60123,121.19767], [46.60178,121.19131], [46.60089,121.19033], [46.59819,121.17102], [46.59056,121.14698],
+    [46.59058,121.14142], [46.58748,121.13146], [46.58626,121.12502], [46.57479,121.09421], [46.57486,121.08971], [46.57317,121.08463],
+    [46.5695,121.06861], [46.56841,121.0667], [46.5673,121.06654], [46.5615,121.05989], [46.55906,121.06016], [46.55595,121.05953],
+    [46.55099,121.06082], [46.54203,121.06121], [46.53803,121.05793], [46.53633,121.05561], [46.53559,121.05279], [46.53063,121.04967],
+    [46.52521,121.04426], [46.51443,121.03647], [46.5126,121.03206], [46.50804,121.02726], [46.49992,121.02277], [46.49273,121.02308],
+    [46.49074,121.0226], [46.4776,121.01497], [46.4763,121.01751], [46.47162,121.01361], [46.47066,121.0119], [46.47137,121.00991],
+    [46.45983,120.99542], [46.45455,120.98288], [46.44853,120.96271], [46.44824,120.95614], [46.44646,120.949], [46.44503,120.93881],
+    [46.4451,120.93409], [46.44411,120.93194], [46.44447,120.92895], [46.44156,120.92121], [46.44301,120.90962], [46.44187,120.90648],
+    [46.44333,120.89744], [46.44275,120.89537], [46.44321,120.88962], [46.44287,120.88523], [46.44354,120.88279], [46.44414,120.87293],
+    [46.44354,120.87116], [46.4416,120.87051], [46.43933,120.866], [46.43957,120.85841], [46.44166,120.85459], [46.44291,120.85342],
+    [46.44542,120.84152], [46.44899,120.8369], [46.45079,120.83559], [46.46047,120.83132], [46.46534,120.82838], [46.46884,120.82469],
+    [46.47089,120.82014], [46.47165,120.81394], [46.47434,120.80666], [46.47694,120.80377], [46.47765,120.80077], [46.48959,120.78378],
+    [46.49294,120.78288], [46.50985,120.79365], [46.51481,120.79373], [46.51753,120.79227], [46.53354,120.77374], [46.5356,120.7697],
+    [46.53773,120.75022], [46.53678,120.7376], [46.53826,120.73099], [46.53956,120.72825], [46.53991,120.72464], [46.54918,120.69168],
+    [46.55927,120.68138], [46.57485,120.67563], [46.58199,120.67623], [46.58771,120.68001], [46.59513,120.69265], [46.5994,120.69861],
+    [46.6016,120.70034], [46.60603,120.70851], [46.61073,120.71507], [46.61464,120.72267], [46.62337,120.72826], [46.63417,120.73716],
+    [46.64077,120.73986], [46.64646,120.74591], [46.64661,120.74748], [46.66115,120.76138], [46.67187,120.77039], [46.675,120.7754],
+    [46.68199,120.78206], [46.68333,120.78539], [46.68704,120.79107], [46.6912,120.80111], [46.69164,120.80502], [46.69254,120.80601],
+    [46.69889,120.80996], [46.70007,120.80828], [46.70205,120.80746], [46.70286,120.80647], [46.70474,120.80741], [46.70466,120.80782],
+    [46.70644,120.80683], [46.70763,120.80717], [46.70824,120.8062], [46.7048,120.80283], [46.70411,120.80097], [46.70493,120.78723],
+    [46.70883,120.76402], [46.71229,120.75255], [46.71596,120.72908], [46.71712,120.726], [46.72092,120.72048], [46.72292,120.71922],
+    [46.72652,120.71876], [46.72744,120.71783], [46.73064,120.70366], [46.73143,120.69512], [46.73219,120.69237], [46.73663,120.68604],
+    [46.73721,120.68239], [46.73849,120.68184], [46.73833,120.67973], [46.74032,120.67927], [46.74064,120.67716], [46.74344,120.6761],
+    [46.74609,120.6732], [46.74548,120.6715], [46.73732,120.67258], [46.73612,120.67164], [46.73681,120.66241], [46.73205,120.62617],
+    [46.73355,120.61978], [46.73353,120.6176], [46.72666,120.5994], [46.72156,120.5763], [46.72099,120.57576], [46.71902,120.57632],
+    [46.71854,120.57596], [46.71587,120.56724], [46.70094,120.53599], [46.70014,120.52911], [46.70118,120.52099], [46.69806,120.51357],
+    [46.69839,120.51215], [46.70003,120.50992], [46.70099,120.50314], [46.70601,120.48869], [46.71281,120.47705], [46.72045,120.47207],
+    [46.72108,120.47116], [46.72031,120.46643], [46.72367,120.45359]
+  ];
+
+
+const CONFIG = {
+
+  /* ---- 抬头 ---- */
+  title: "不在马厩-绿水营地·兴安一号公路 · 单日穿越路书",
+  subtitle: "草原 · 湿地 · 林海 —— 不在马厩咖啡馆 → 满族屯湿地 → 特门牧场嘎查 → 明水河镇 → CAMP LVSHUI绿水营地",
+
+  /* ---- 地图上方那排小标签 ---- */
+  chips: [
+    "🚙 自驾 / 越野车",
+    "📏 实际道路约 <b>104 km</b>",
+    "⏱ 单日 · 纯行车约 <b>2–3 h</b>",
+    "📍 打卡点 <b>5</b> 处 · 补给 <b>2</b> 处"
+  ],
+
+  /* ---- 地图说明 ---- */
+  mapNote: "🔍 地图可缩放拖拽 · 点击彩色图钉查看节点详情 · 金色线为行进路线（示意）",
+
+  /* ---- 路线节点 ----
+     每个节点可设：
+       icon    地图图标（emoji，想换什么就填什么）
+       mapName 地图上标注的名字（留空则用 name）
+       loc     地图标注下的小字（行政区划/位置）
+       name    卡片标题用的名字
+  */
+  stops: [
+    {
+      name: "不在马厩·咖啡馆",
+      mapName: "黑羊山 · 不在马厩",
+      loc: "兴安盟 科尔沁右翼前旗",
+      icon: "📷",
+      sub: "黑羊山旅游度假区 · 半山腰",
+      type: "start",
+      label: "起",
+      lat: 46.5150, lng: 121.3950,
+      time: "⏰ 建议 9:00 出发",
+      desc: "依山临崖的「草原最孤独咖啡馆」，室内 270 度全景落地窗与室外露台俯瞰整片哈日雅玛图草原，也是「最美杭盖草原」自驾路线的起点。出发前在此喝杯咖啡、检查车况，正式开始自驾穿越。",
+      extra: [
+        { icon: "🐎", title: "不在马厩 · 马术俱乐部", text: "约 17900 ㎡ 的体验区，设接待中心、马厩、驯马区、多条草原野骑路线等功能区，可在围栏体验骑乘、在草原上野骑驰骋，沉浸式感受草原风情。" },
+        { icon: "🏡", title: "牧野山涧度假酒店 · 独栋木屋", text: "黑羊山景区内的度假酒店，31 间客房，主打散落在草地上的独立森林木屋，推窗即见草原；配中蒙融合餐厅与咖啡厅。" }
+      ],
+      photo: "/Users/maltesetiger/Desktop/不在马厩-绿水营地路书1.0/photos/1-不在马厩咖啡馆.JPG"
+    },
+    {
+      name: "满族屯湿地",
+      mapName: "满族屯湿地",
+      loc: "兴安盟 科尔沁右翼前旗",
+      icon: "🪶",
+      sub: "打卡点 · 湿地草原",
+      type: "spot",
+      label: "1",
+      lat: 46.4720, lng: 121.0130,
+      time: "⏰ 约 10:00–11:00 · 停留 40–50 分钟",
+      desc: "约 40 万亩湿地草原，溪流九曲蜿蜒于草场。登上路边山坡木栈道，可俯瞰湿地全景，是全线最出片的打卡点。附近的满族屯满族乡可以加油、用餐、补给。",
+      photo: "/Users/maltesetiger/Desktop/不在马厩-绿水营地路书1.0/photos/2-满族屯湿地.JPG"
+    },
+    {
+      name: "特门牧场嘎查",
+      mapName: "特门牧场嘎查",
+      loc: "兴安盟 科尔沁右翼前旗",
+      icon: "🐑",
+      sub: "丘陵草原 · 岔路口",
+      type: "spot",
+      label: "2",
+      lat: 46.6258, lng: 120.7453,
+      time: "⏰ 约 12:30–13:00 · 沿途打卡 20–30 分钟",
+      desc: "1956 年建场的特门牧场所在地，「特门郭勒」有机羊产地。过满族屯湿地后继续沿公路向西，经岔路口拐向特门嘎查方向；此段深入兴安岭山地，保持着内蒙古原生态的牧场状态，风景优美。注意此段路没有信号，且公路再无旁支。",
+      photo: "/Users/maltesetiger/Desktop/不在马厩-绿水营地路书1.0/photos/3-特门牧场嘎查.JPG"
+    },
+    {
+      name: "明水河镇",
+      mapName: "明水河镇",
+      loc: "兴安盟 阿尔山市",
+      icon: "⛽",
+      sub: "S203 交汇 · 加油补给",
+      type: "stop",
+      label: "3",
+      lat: 46.7065, lng: 120.8045,
+      time: "⏰ 约 13:30–15:00 · 补给加油",
+      desc: "阿尔山市最南端、与 S203 交汇。镇南 5 公里的明水大岗观景台可俯瞰大兴安岭林海。",
+      extra: [
+        { icon: "⛽", title: "全线最可靠的补给点", text: "兴安一号公路沿线补给稀少，这里是加油最稳妥的地方之一，建议加满油，同时吃午饭、补充饮水与干粮，再前往营地。" }
+      ],
+      photo: "/Users/maltesetiger/Desktop/不在马厩-绿水营地路书1.0/photos/4-明水河镇.JPG"
+    },
+    {
+      name: "CAMP LVSHUI绿水营地",
+      mapName: "CAMP LVSHUI 绿水营地",
+      loc: "兴安盟 科尔沁右翼前旗",
+      icon: "⛺",
+      sub: "绿水种畜繁育中心东 5 km",
+      type: "end",
+      label: "终",
+      lat: 46.7065, lng: 120.4377,
+      time: "⏰ 约 16:00 抵达 · 扎营观星",
+      desc: "占地约 20 万㎡的成熟营地：帐篷、星空餐厅、独立卫浴、马场与森林休闲区。抵达后扎营，日落后草原星野极佳，为整趟穿越画上句号。",
+      photo: "/Users/maltesetiger/Desktop/不在马厩-绿水营地路书1.0/photos/5-绿水营地.jpg"
+    }
+  ],
+
+  /* ---- 沿途影像（照片墙） ----
+     小众路线网上照片少，这一栏专门放自己沿途拍的片子。
+     每条一项：src=图片地址（photos/ 文件夹里已按序号放好）
+              title=图注主标题   text=一句补充   geo=拍摄地点小字
+              tag=左上角角标（可留空）
+              wide=true  → 这张横跨两列，适合放最出片的一张
+     想换照片：把新图丢进 photos/ 文件夹，改 src 的文件名即可。
+     想放几张就写几条，增删条目即可。
+  */
+  photos: [
+    { src: "/Users/maltesetiger/Desktop/不在马厩-绿水营地路书1.0/photos/6-不在马厩打卡点.JPG", tag: "出发", wide: true,
+      title: "黑羊山 · 不在马厩",
+      text: "山坡上的「草原最孤独咖啡馆」，门前logo是起点最好的打卡位。",
+      geo: "兴安盟 科尔沁右翼前旗 · 半山腰" },
+    { src: "/Users/maltesetiger/Desktop/不在马厩-绿水营地路书1.0/photos/7-湿地九曲.JPG", tag: "",
+      title: "湿地九曲",
+      text: "登上栈道俯瞰，溪流在红橙草甸间画出九道弯。",
+      geo: "满族屯湿地 · 观景栈道" },
+    { src: "/Users/maltesetiger/Desktop/不在马厩-绿水营地路书1.0/photos/8-牧野山涧.jpg", tag: "",
+      title: "黑羊山 · 牧野山涧",
+      text: "散落在白桦林间的独栋木屋，露台正对草甸，秋色正浓。",
+      geo: "兴安盟 科尔沁右翼前旗 · 黑羊山景区" },
+    { src: "/Users/maltesetiger/Desktop/不在马厩-绿水营地路书1.0/photos/9-牧场.jpg", tag: "",
+      title: "原生态牧场",
+      text: "打草季的牧场，装载机来回码着草捆，远处是收整过的草场。",
+      geo: "特门牧场嘎查" },
+    { src: "/Users/maltesetiger/Desktop/不在马厩-绿水营地路书1.0/photos/10-兴安林海.jpg", tag: "",
+      title: "兴安岭林海",
+      text: "过特门后公路爬上山脊，白桦与落叶松染成金橙，林间偶见白色尖顶小屋。",
+      geo: "明水河镇 · 明水大岗" },
+    { src: "/Users/maltesetiger/Desktop/不在马厩-绿水营地路书1.0/photos/11-蓝调时刻.jpg", tag: "终点", wide: true,
+      title: "蓝调时刻",
+      text: "日落后天光压成深蓝，营地帐篷的灯一盏盏亮起，像草原上的走马灯。",
+      geo: "CAMP LVSHUI 绿水营地" }
+  ],
+
+  /* ---- 关键提醒 ---- */
+  tips: [
+    { tone: "warn", title: "⚠️ 岔路口", text: "过满族屯湿地后继续向西，在勿布林和特门的岔路口向右拐向「特门」方向；此后深入兴安岭牧区，公路再无旁支，一直通到明水河镇。" },
+    { tone: "warn", title: "📡 信号弱", text: "特门一带手机信号可能中断，出发前下载离线地图，不要完全依赖实时导航。" },
+    { tone: "info", title: "⛽ 补给点", text: "满族屯满族乡和明水河镇是全线较为可靠的加油点，进入特门段前后确保油箱充足。" },
+    { tone: "info", title: "🐂 牲畜优先", text: "牧区牛羊常横穿公路，减速慢行、不鸣笛驱赶，遇畜群停车等待。" }
+  ],
+
+  /* ---- 里程与用时表 ---- */
+  segments: [
+    { no: "起点", route: "不在马厩·咖啡馆 → 满族屯湿地", dist: "约 26 km", note: "沿公路先向北绕行再向西，进入风光段" },
+    { no: "①→②", route: "满族屯湿地 → 特门嘎查牧场", dist: "约 35 km", note: "向西深入山地，岔路口拐向「特门」方向" },
+    { no: "②→③", route: "特门嘎查牧场 → 明水河镇", dist: "约 15 km", note: "北上接入 S203 交汇处" },
+    { no: "③→终点", route: "明水河镇 → CAMP LVSHUI绿水营地", dist: "约 28 km", note: "沿 S203 向西约 28 km 后转入营地" },
+    { no: "合计", route: "全程（沿实际道路）", dist: "约 104 km", note: "纯行车约 2.5–3 小时，含停留全天约 8–10 小时" }
+  ],
+
+  /* ---- 页脚 ---- */
+  footer: [
+    "自驾路书 · 单日穿越 ｜ 起点：不在马厩·咖啡馆 → 终点：CAMP LVSHUI绿水营地",
+    "底图 © OpenStreetMap contributors · Esri ｜ 节点坐标为图上定位，实际以导航与路牌为准",
+  
+  ]
+};
+
+/* ============================================================================
+ *  以下为渲染逻辑，一般不需要修改
+ * ==========================================================================*/
+
+const TYPE_META = {
+  start: { color: "#c83c2d", cls: "start" },
+  spot:  { color: "#2a6136", cls: "" },
+  stop:  { color: "#2f7d95", cls: "stoptype" },
+  end:   { color: "#c8952f", cls: "end" }
+};
+
+/* ---------- 页头 ---------- */
+function renderHeader(){
+  document.getElementById("h-title").textContent = CONFIG.title;
+  document.getElementById("h-sub").textContent = CONFIG.subtitle;
+  document.getElementById("h-chips").innerHTML =
+    CONFIG.chips.map(c => `<span class="chip">${c}</span>`).join("");
+  document.getElementById("map-note").textContent = CONFIG.mapNote;
+}
+
+/* ---------- 节点卡片 ---------- */
+function renderStops(){
+  const box = document.getElementById("stops");
+  const spots = CONFIG.stops.filter(s => s.type === "spot").length;
+  const stops = CONFIG.stops.filter(s => s.type === "stop").length;
+  document.getElementById("stop-count").textContent =
+    `共 ${CONFIG.stops.length} 个节点 · 其中途经/打卡 ${spots} 个 · 补给 ${stops} 个`;
+
+  box.innerHTML = CONFIG.stops.map(s => {
+    const m = TYPE_META[s.type] || TYPE_META.spot;
+    const photo = s.photo
+      ? `<div class="photo"><img src="${s.photo}" alt="${s.name}"></div>`
+      : `<div class="photo"><span class="ic">📷</span>${s.name}照片<br>点此替换</div>`;
+    const extra = (s.extra || []).length
+      ? `<div class="extra-box">` + s.extra.map(e =>
+          `<div class="ex-item"><div class="ex-t">${e.icon || ""} ${e.title}</div>
+           <div class="ex-d">${e.text}</div></div>`).join("") + `</div>`
+      : "";
+    return `<div class="stop ${m.cls}">
+      <div class="no">${s.label}</div>
+      <div class="info">
+        <h3>${s.icon || ""} ${s.name}<small>${s.sub || ""}</small></h3>
+        <div class="desc">${s.desc || ""}</div>
+        ${extra}
+        ${s.time ? `<span class="time">${s.time}</span>` : ""}
+      </div>
+      ${photo}
+    </div>`;
+  }).join("");
+}
+
+/* ---------- 沿途影像 ---------- */
+function renderPhotos(){
+  const list = CONFIG.photos || [];
+  const box = document.getElementById("gallery");
+  const cnt = document.getElementById("photo-count");
+  if (cnt) cnt.textContent = list.length
+    ? `共 ${list.length} 张 · 照片与图注均可在 CONFIG 里替换` : "";
+  if (!box) return;
+  box.innerHTML = list.map(p => {
+    const frame = p.src
+      ? `<div class="frame"><img src="${p.src}" alt="${p.title || ""}"></div>`
+      : `<div class="frame"><span class="ic">🖼️</span>待补 · 放入照片</div>`;
+    const tag = p.tag ? `<span class="tag">${p.tag}</span>` : "";
+    const cap = `<div class="cap"><b>${p.title || ""}</b>${p.text || ""}
+      ${p.geo ? `<div class="geo">📍 ${p.geo}</div>` : ""}</div>`;
+    return `<div class="shot${p.wide ? " wide" : ""}">${tag}${frame}${cap}</div>`;
+  }).join("");
+}
+
+/* ---------- 提醒 ---------- */
+function renderTips(){
+  document.getElementById("tips").innerHTML = CONFIG.tips.map(t =>
+    `<div class="tip ${t.tone === "warn" ? "warn" : ""}"><b>${t.title}</b>${t.text}</div>`
+  ).join("");
+}
+
+/* ---------- 表格 ---------- */
+function renderSegments(){
+  document.getElementById("seg-tbody").innerHTML = CONFIG.segments.map(s =>
+    `<tr><td><b style="color:#1d4a2c">${s.no}</b></td><td>${s.route}</td>
+     <td>${s.dist}</td><td>${s.note}</td></tr>`
+  ).join("");
+}
+
+/* ---------- 页脚 ---------- */
+function renderFooter(){
+  document.getElementById("footer").innerHTML = CONFIG.footer.join("<br>");
+}
+
+/* ---------- 地图 ---------- */
+let map, markers = [];
+function renderMap(){
+  if (map) { map.remove(); markers = []; }
+  map = L.map("map", { scrollWheelZoom: true });
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 17,
+    attribution: "底图 © OpenStreetMap contributors · Esri"
+  }).addTo(map);
+
+  const line = CONFIG.stops.map(s => [s.lat, s.lng]);
+  // 优先用真实路网轨迹；没有则退化为直连
+  const routeLine = (typeof ROUTE_GEOM !== "undefined" && ROUTE_GEOM.length > 1)
+    ? ROUTE_GEOM : line;
+
+  if (routeLine.length > 1) {
+    // 白色描边（下层）
+    L.polyline(routeLine, { color:"#ffffff", weight:11, opacity:.6 }).addTo(map);
+    // 金色主线 —— 沿实际道路
+    L.polyline(routeLine, { color:"#c8952f", weight:5, opacity:.96, lineJoin:"round" }).addTo(map);
+    // 虚线内层
+    L.polyline(routeLine, { color:"#ffeebc", weight:1.6, dashArray:"9 11", opacity:.9 }).addTo(map);
+  }
+
+  CONFIG.stops.forEach(s => {
+    const m = TYPE_META[s.type] || TYPE_META.spot;
+    const icon = s.icon || "📍";
+    const mapName = s.mapName || s.name;
+    const lblCls = s.type === "start" ? "lbl-start"
+                 : s.type === "end"   ? "lbl-end"
+                 : s.type === "stop"  ? "lbl-stop" : "";
+    // 名称 + 小字位置；图标 + 常驻标签
+    const locLine = s.loc ? `<span class="loc">${s.loc}</span>` : "";
+    const html = `<div class="pin-wrap">
+        <div class="pin-label ${lblCls}">${mapName}${locLine}</div>
+        <div class="pin" style="background:${m.color}"><span>${icon}</span></div>
+      </div>`;
+    const iconObj = L.divIcon({
+      className: "",
+      html,
+      iconSize: [40, 40],
+      iconAnchor: [20, 40],
+      popupAnchor: [0, -40]
+    });
+    // 附加区块（如骑马、木屋住宿）
+    const extraHtml = (s.extra || []).map(e =>
+      `<div class="pk-extra"><b>${e.icon || ""} ${e.title}</b><span>${e.text}</span></div>`
+    ).join("");
+    const popup = `<div class="pk-title">${icon} ${s.name}</div>
+      <div class="pk-sub">${s.sub || ""}${s.loc ? " · " + s.loc : ""}</div>${s.desc || ""}
+      ${extraHtml}
+      ${s.photo ? `<div class="pk-photo"><img src="${s.photo}"></div>` : ""}`;
+    markers.push(L.marker([s.lat, s.lng], { icon: iconObj }).addTo(map).bindPopup(popup));
+  });
+
+  // 视野要留出标签空间
+  const boundsPts = routeLine.length > 1 ? routeLine : line;
+  if (boundsPts.length > 1) map.fitBounds(L.polyline(boundsPts).getBounds(), { padding: [78, 78] });
+  else if (line.length === 1) map.setView(line[0], 12);
+  else map.setView([46.5, 121.1], 9);
+}
+
+/* ---------- 编辑帮助 ---------- */
+function toggleEditHelp(){
+  const help = `【怎么改这份路书】
+
+1) 用「记事本」或 VS Code 打开本 .html 文件
+2) 拉到文件底部，找到这一行：
+     const CONFIG = {
+3) 里面所有内容都可以改，例如：
+   · title / subtitle      → 改标题、副标题
+   · chips                 → 改顶部标签，支持 <b>加粗</b>
+   · stops                 → 改路线节点（增删都可以）
+        icon  地图图标(emoji)   mapName 地图上标注的名字
+        loc   标注下的小字(位置) name  卡片标题名字
+        sub   小字说明          lat/lng 经纬度
+        type  start/spot/stop/end      label 圆形徽标字
+        time  时间文案          desc  描述
+        extra 附加区块，如：[{icon:"🐎",title:"马术俱乐部",text:"..."}]
+        photo 照片地址
+   · tips                  → 改关键提醒
+   · photos                → 改「沿途影像」照片墙
+        src   图片地址（写文件名最省事）   title 图注标题
+        text  一句补充说明                 geo   拍摄地点小字
+        tag   左上角角标（可留空）          wide  true=横跨两列放最出片的
+   · segments              → 改里程表
+   · footer                → 改页脚
+4) 保存文件 → 浏览器按 F5 刷新 → 全部自动更新
+
+【照片怎么放】
+把图片和 html 放同一个文件夹，然后写：
+   ① 节点照片   photo: "1-咖啡馆.jpg"
+   ② 照片墙     photos: [ { src:"2-湿地.jpg", title:"湿地九曲" } ]
+或写完整路径：
+   photo: "D:/路书/1.jpg"
+留空 "" 就显示「待补」虚线框。`;
+  alert(help);
+}
+
+/* ---------- 启动 ---------- */
+renderHeader();
+renderStops();
+renderPhotos();
+renderTips();
+renderSegments();
+renderFooter();
+renderMap();
+</script>
+</body>
+</html>
